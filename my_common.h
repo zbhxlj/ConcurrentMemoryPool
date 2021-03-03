@@ -8,6 +8,7 @@
 const size_t MAX_BYTES = 64 * 1024; // ThreadCache 负责分配的 小对象的最大内存
 const size_t PAGE_SHIFT = 12;  // 页面大小为4k
 const size_t NLIST = 184;  // 自由链表数组元素个数
+const size_t NPAGES = 129; // Span 的最大页面数
 
 // obj 即为自由链表中的节点
 // 该函数使得可以使用该空间的前八个字节储存下一未分配空间的地址
@@ -25,8 +26,8 @@ inline static void*& NextObj(void* obj){
 class FreeList{
 private:
     void* _list = nullptr;
-    size_t _size;
-    size_t _max_size;
+    size_t _size;   // 自由链表中的节点个数
+    size_t _max_size;   //自由链表中最大节点个数
 
 public:
     // 插入头部
@@ -74,7 +75,7 @@ public:
 };
 
 class SizeClass{
-private:
+public:
     // 返回 大小为size 的内存块 对应的自由链表在数组中的index
     // size 最小为1 
     inline static size_t _Index(size_t size, size_t align){
@@ -152,9 +153,8 @@ public:
     }
 };
 
-using Page_ID = long long;
+using Page_ID = unsigned long long;
 
-// Span是一些连续页内存 (注意连续, 因为最初请求了一个大对象然后切分的)
 // 既可以分配内存出去 (Central Free List 中切分成若干个object, 向 Thread Cache 分配)
 // 也负责将内存回收到 PageCache 合并 (use_count 为 0)
 
@@ -173,11 +173,87 @@ struct Span{
 
 // 双向循环列表, 插入删除效率高
 class SpanList{
+    
+public:
     Span* head;
     std::mutex mutex;
-
+    
+public: 
     SpanList() : head(new Span()) {
         head -> next = head;
         head -> prev = head;
+    }
+
+    ~SpanList() {
+        Span* cur = head -> next;
+        while(cur != head){
+            Span* next = cur -> next;
+            // 因为整个内存池都销毁, 是不是这时候一定是进程销毁了?  是 
+            // 获得的内存由我们再分配
+            // 保存页面页号的数据结构被破坏, 而系统仍然认为这时候我们持有这块内存
+            delete cur; 
+            cur = next;
+        }
+        delete head;
+        head = nullptr;
+    }
+
+    // 返回第一个节点
+    Span* Begin(){
+        return head -> next;
+    }
+
+    // 返回最后一个节点的下一节点
+    Span* End(){
+        return head;
+    }
+
+    bool Empty(){
+        return head -> next == head;
+    }
+
+    // 在 pos前插入
+    void Insert(Span* pos, Span* new_span){
+        Span* prev = pos -> prev;
+        prev -> next = new_span;
+        new_span -> prev = prev;
+        pos -> prev = new_span;
+        new_span -> next = pos;
+    }
+
+    // 将 pos 移出 SpanList
+    void Erase(Span* pos){
+        Span* prev = pos -> prev;
+        Span* next = pos -> next;
+        prev -> next = next;
+        next -> prev = prev;
+    }
+
+    void PushFront(Span* new_span){
+        Insert(Begin(), new_span);
+    }
+
+    void PushBack(Span* new_span){
+        Insert(End(), new_span);
+    }
+
+    Span* PopFront(){
+        Span* front = Begin();
+        Erase(front);
+        return front;
+    }
+
+    Span* PopBack(){
+        Span* back = End() -> prev;
+        Erase(back);
+        return back;
+    }
+
+    void Lock(){
+        mutex.lock();
+    }
+
+    void UnLock(){
+        mutex.unlock();
     }
 };
