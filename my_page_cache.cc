@@ -1,6 +1,10 @@
 #include "my_page_cache.h"
 #include <new>
 
+PageCache* PageCache::_instance = nullptr;
+std::mutex PageCache::_mutex;
+
+
 Span* PageCache::AllocBigPageObj(size_t size){
     assert(size > MAX_BYTES);
 
@@ -74,7 +78,7 @@ Span* PageCache::_NewSpan(size_t pages_num){
             left -> page_num = i - pages_num;
             left -> page_id += pages_num;
 
-            for(int i = ret_span ->page_id; i != left ->page_id; i++)
+            for(size_t i = ret_span ->page_id; i != left ->page_id; i++)
                 _map_id_to_span[i] = ret_span;
 
             // 将 left 插入合适的桶
@@ -84,6 +88,7 @@ Span* PageCache::_NewSpan(size_t pages_num){
         }
     }
 
+    // std::cout << "Now is preparing to apply memory!" << std::endl;
     // 山穷水尽  向系统要空间
     void* ptr = malloc((NPAGES - 1) << PAGE_SHIFT);
     if(ptr == nullptr)
@@ -92,11 +97,15 @@ Span* PageCache::_NewSpan(size_t pages_num){
     new_span ->page_num = NPAGES - 1;
     new_span ->page_id = (Page_ID)ptr >> PAGE_SHIFT;
 
-    for(int i = new_span ->page_id; i != new_span ->page_id + new_span -> page_num; i++)
+    // std::cout << "Before for range !" << std::endl;
+    for(size_t i = new_span ->page_id; i != new_span ->page_id + new_span -> page_num; i++){
+        // std::cout << i << std::endl;
         _map_id_to_span[i] = new_span;
+    }
     
     _span_list[NPAGES - 1].PushFront(new_span);
 
+    // std::cout << "Now is quiting NewSpan!" << std::endl; 
     return _NewSpan(pages_num);
 }
 
@@ -131,7 +140,7 @@ void PageCache::ReleaseSpanToPageCache(Span* cur){
         if(cur -> page_num + prev -> page_num > NPAGES - 1)
             break;
 
-        for(int i = prev -> page_id; i != prev -> page_id + prev -> page_num; i++){
+        for(size_t i = prev -> page_id; i != prev -> page_id + prev -> page_num; i++){
             _map_id_to_span[i] = cur;
         }
 
@@ -161,7 +170,7 @@ void PageCache::ReleaseSpanToPageCache(Span* cur){
         if(cur -> page_num + next -> page_num > NPAGES - 1)
             break;
 
-        for(int i = next -> page_id; i != next -> page_id + next -> page_num; i++){
+        for(size_t i = next -> page_id; i != next -> page_id + next -> page_num; i++){
             _map_id_to_span[i] = cur;
         }
 

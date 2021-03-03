@@ -1,7 +1,9 @@
-#pragma once
+#ifndef COMMON_H
+#define COMMON_H
 #include<cstdlib>
 #include<assert.h>
 #include<mutex>
+#include<iostream>
 
 // 该文件包含基本类 和 常量定义
 
@@ -257,3 +259,5 @@ public:
         mutex.unlock();
     }
 };
+
+#endif

@@ -1,0 +1,2 @@
+main: my_unit_test.cc my_thread_cache.cc my_central_cache.cc my_page_cache.cc my_concurrent_alloc.h
+	g++ -o main my_unit_test.cc my_thread_cache.cc my_central_cache.cc my_page_cache.cc my_concurrent_alloc.h

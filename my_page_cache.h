@@ -1,4 +1,5 @@
-#pragma once 
+#ifndef PAGE_CACHE_H
+#define PAGE_CACHE_H
 #include "my_common.h"
 #include<unordered_map>
 
@@ -38,5 +39,5 @@ private:
     static std::mutex _mutex;
 };
 
-PageCache* PageCache::_instance = nullptr;
-std::mutex PageCache::_mutex;
+
+#endif

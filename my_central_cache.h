@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CENTRAL_CACHE_H
+#define CENTRAL_CACHE_H
 #include "my_common.h"
 
 class CentralCache{
@@ -28,5 +29,5 @@ private :
     static CentralCache* _instance;
 };
 
-std::mutex CentralCache::_mutex;
-CentralCache* CentralCache::_instance = nullptr;
+
+#endif
